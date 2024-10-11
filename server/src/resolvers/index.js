@@ -1,27 +1,50 @@
-// src/resolvers/index.js
-import db from '../config/db.js';
+import { checkEmail, getAllLeads, getLeadByID, postRegister } from '../models/model.js';
+import { validateRegister, validateLeadID } from '../validations/validations.js';
+import { validationResult } from 'express-validator';
 
 const resolvers = {
   Query: {
     leads: async () => {
-      const result = await db.query('SELECT * FROM leads');
-      return result.rows;
+      const result = await getAllLeads();
+      return result;
     },
     lead: async (_, { id }) => {
-      const result = await db.query('SELECT * FROM leads WHERE id = $1', [id]);
-      return result.rows[0];
+      const req = { params: { id } };
+
+      for (const validation of validateLeadID) {
+        await validation.run(req);
+      }
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        throw new Error(errors.array().map(err => err.msg).join(', '));
+      }
+
+      const result = await getLeadByID(id);
+      return result;
     },
   },
   Mutation: {
-    register: async (
-      _,
-      { name, email, mobile, postcode, services }
-    ) => {
-      const result = await db.query(
-        'INSERT INTO leads (name, email, mobile, postcode, services) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [name, email, mobile, postcode, JSON.stringify(services)]
-      );
-      return result.rows[0];
+    register: async (_, args, { req }) => {
+      const { name, email, mobile, postcode, services } = args;
+      req.body = { name, email, mobile, postcode, services };
+
+      for (const validation of validateRegister) {
+        await validation.run(req);
+      }
+ 
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        throw new Error(errors.array().map(err => err.msg).join(', '));
+      }
+
+      const isDuplicate = await checkEmail(email);
+      if (isDuplicate) {
+        throw new Error('User already exists');
+      }
+
+      const result = await postRegister(name, email, mobile, postcode, services);
+      return result;
     },
   },
 };

@@ -5,7 +5,7 @@ import typeDefs from './types/index.js';
 import resolvers from './resolvers/index.js';
 
 const app = express();
-const server = new ApolloServer({ typeDefs, resolvers });
+const server = new ApolloServer({ typeDefs, resolvers, context: ({ req }) => ({ req }) });
 
 const startServer = async () => {
   await server.start();
